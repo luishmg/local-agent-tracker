@@ -1,0 +1,37 @@
+# Default exclusions
+.DS_Store
+.env
+node_modules/
+__pycache__/
+.terraform/
+
+# Editor files
+*.swp
+*.swo
+*.kate-swp
+
+# Build artifacts
+/dist/
+/build/
+/out/
+*.egg-info/
+
+# Python environments
+.venv/
+
+# Local stores — never committed; the DB is derived data and can contain
+# project paths from every session ever ingested.
+*.db
+*.db-wal
+*.db-shm
+
+# Test/coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Log files
+*.log
+npm-debug.log*
+
+*.tar
