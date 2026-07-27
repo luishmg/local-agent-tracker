@@ -1,0 +1,46 @@
+[Unit]
+Description=local-agent-tracker collector (ingest Claude Code and pi transcripts)
+Documentation=https://github.com/luishmg/local-agent-tracker
+# Only meaningful once the sources exist; harmless on a fresh machine.
+ConditionPathExists=%h/.claude/projects
+
+[Service]
+Type=oneshot
+
+# flock guards against a slow run overlapping the next timer fire. --nonblock
+# means the second invocation exits immediately rather than queueing, which is
+# the right call for a 5-minute cadence: the work is idempotent and the next
+# fire will pick it up.
+ExecStart=/usr/bin/flock --nonblock %t/agent-tracker.lock \
+    %h/Projects/local-agent-tracker/.venv/bin/tracker collect --quiet
+
+# The collector reads transcripts that may contain anything the user works on.
+# It needs no privilege beyond reading them and writing its own store.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+# ...except its own data directory, which must stay writable.
+ReadWritePaths=%h/.local/share/local-agent-tracker
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+MemoryDenyWriteExecute=true
+LockPersonality=true
+
+# Measured peak RSS on a 513 MB first backfill is ~125 MB. This ceiling is well
+# above that and well below anything earlyoom would react to (architecture.md §1).
+MemoryMax=512M
+CPUWeight=20
+IOWeight=20
+Nice=10
+
+# Postgres credentials for the deferred shipper belong here, never in the repo:
+#   Environment=TRACKER_POSTGRES_DSN=postgresql://...
+# Prefer an EnvironmentFile with 0600 permissions over an inline Environment=.
+# EnvironmentFile=-%h/.config/local-agent-tracker/env
+
+[Install]
+WantedBy=default.target

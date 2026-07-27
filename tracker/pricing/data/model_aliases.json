@@ -1,0 +1,7 @@
+{
+  "_comment": "Observed model id -> pricing key. A null value means DELIBERATELY zero-rated (local, unbilled) as distinct from unknown. Hand-maintained: `tracker pricing update` never overwrites this file.",
+  "_note_on_date_suffixes": "Ids like `claude-haiku-4-5-20251001` need no entry -- the resolver strips a trailing -YYYYMMDD and retries before giving up. Entries here are for aliases that are NOT a date-suffixed form of their pricing key.",
+  "_note_on_fable": "claude-fable-5 is a real first-party model at $10/$50 per MTok, NOT an alias of an Opus-tier model. It is priced directly in the pricing table and must not be aliased -- doing so would under-report its cost by half.",
+
+  "<synthetic>": null
+}

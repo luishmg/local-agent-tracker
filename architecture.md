@@ -60,9 +60,26 @@ Tool outcomes: `role: "toolResult"` messages carry `toolName`, `toolCallId`, `is
 
 Supplementary: `~/.pi/agent/run-history.jsonl` — one line per subagent run: `agent`, `task`, `ts` (epoch s), `status` (`ok`/`error`), `duration` (ms). No tokens/cost.
 
+Two entry shapes were missing from this section and are **billable**:
+
+- **`compaction` entries** carry their own `usage` *and* `usage.cost` — real spend attached to no assistant message. They have no `model` of their own, so the parser tracks the session's active model (from `model_change` entries and preceding assistant messages) and attributes compaction spend to it. Older entries have no `usage` block at all, so it is optional. Their `summary` field is a verbatim conversation summary and their `details.readFiles`/`modifiedFiles` are the user's paths — all three are discarded, and only counts are kept (§8).
+- **`usage.reasoning`** is a **subset of `output`**, not additional tokens. Verified: `input + output + cacheRead + cacheWrite == totalTokens` holds exactly even when `reasoning` is non-zero (e.g. 9622 + 301 + 0 + 0 = 9923 with `reasoning` 132). It is stored as a diagnostic breakdown and is never a term in a cost formula — adding it would double-bill the thinking.
+
+**`~/.pi/agent/sessions/` is not homogeneous.** Its `.jsonl` files are three different things, and discovery is an explicit allowlist of path shapes rather than a recursive glob:
+
+| Path shape | Count | What it is |
+|---|---|---|
+| `<slug>/<iso-ts>_<uuid>.jsonl` | 146 | real pi session transcripts |
+| `<slug>/claude-code-artifacts/*.jsonl` | 120 | **Claude Code SDK stream-json — not pi format** |
+| `<slug>/<session>/<toolcall-id>/run-0/session.jsonl` | 7 | pi nested subagent sessions |
+
+The middle group is excluded outright: it uses Claude's `snake_case` shape (so the pi parser reads zero tokens off it), and 82 of its 85 distinct session ids also exist under `~/.claude/projects/`, making it duplicate spend. The last group is five levels deep and is real, otherwise-uncounted subagent spend.
+
 ### 3.2 Claude Code transcripts — `~/.claude/projects/<cwd-slug>/<session-uuid>.jsonl`
 
-Subagent transcripts live under `<session-uuid>/subagents/agent-*.jsonl` (with `.meta.json` siblings) and must be ingested too — subagent tokens are real spend.
+Subagent transcripts live under `<session-uuid>/subagents/agent-*.jsonl` (with `.meta.json` siblings) and must be ingested too — subagent tokens are real spend. They carry the **parent** `sessionId`, so their cost rolls up into the parent session automatically; `agentId` is the sub-thread discriminator, and `attributionAgent` names the subagent type.
+
+**Subagent transcripts nest deeper than one level.** Workflow-spawned subagents live at `<session-uuid>/subagents/workflows/wf_<id>/agent-*.jsonl` — 304 files here, ~1,800 billed messages. A direct-children glob of `subagents/` misses all of them, so discovery recurses and filters on the `agent-` filename prefix. That prefix is load-bearing: `journal.jsonl` sits in the same directories and is workflow bookkeeping, not a transcript.
 
 Usage lives on lines with `type == "assistant"`:
 
@@ -86,8 +103,12 @@ All components live in this repo and run from one entry point: `tracker <command
 
 ### 4.1 Collector (`tracker collect`)
 - Fired by a **systemd user timer every 5 minutes** plus `OnBootSec`; runs, ingests, renders, ships, exits. `flock` guard against overlapping runs.
-- **Incremental** via per-file watermarks: an `ingest_files` table stores `(path, inode, byte_offset, mtime)`; only new bytes are parsed. Rotated/truncated files (inode or shrunken size mismatch) are re-ingested from zero — safe because all writes are idempotent upserts keyed on natural ids (`sessionId` + message `uuid`/`requestId` for Claude Code; session file + entry `id` for pi).
-- Parsing is tolerant: unknown entry types and malformed lines are counted and skipped, never fatal (agents update; schemas drift).
+- **Incremental** via per-file watermarks: an `ingest_files` table stores `(path, inode, byte_offset, mtime)`; only new bytes are parsed. The watermark is newline-anchored — it advances only past the last *complete* line, because the collector reads files the agents are actively appending to. Rotated/truncated files (inode or shrunken size mismatch) are re-ingested from zero — safe because all writes are idempotent upserts keyed on the dedup key below.
+- **Dedup key**: the provider's message id, scoped **globally** rather than per-session — `message.id` for Claude Code, `sha256(entry_id|timestamp|model|totalTokens)` for pi (which assigns no message id). See [ADR-0005](./docs/adr/0005-global-message-dedup-key.md). Two measured properties of the on-disk data force this:
+  - Claude Code writes one API response as **several JSONL lines, one per content block, each repeating the complete `message.usage`** (measured: 755 assistant lines → 368 distinct `message.id`, a 2.05× fan-out). The line `uuid` is per content block, so keying on it bills one response once per block. The parser must collapse a content-block run into one Message while streaming.
+  - Both agents **copy message history into a new transcript when a session is resumed or forked** (measured: 148 of 9,186 distinct `message.id` appear under more than one `sessionId`). A session-scoped key double-bills every resumed session.
+- Parsing is tolerant: unknown entry types and malformed lines are counted and skipped, never fatal (agents update; schemas drift). **Tolerance and the skip counter are different things**: a line type the parser does not care about is ignored *silently*, and only a line that should have carried usage but could not be read increments `lines_skipped`. Getting this wrong is not harmless — dispatching on validity before line type counted Claude Code's `file-history-delta` and `file-history-snapshot` entries (which carry no `sessionId`) as corruption, producing 2,453 false alarms that would have masked genuine schema drift.
+- **Rotation detection cannot rely on the inode alone.** Deleting and recreating a file frequently reuses its inode. A file whose `mtime` moved but which has no bytes past the stored offset was therefore rewritten in place, not appended to; the offset is discarded and the file re-read in full. Reading from the stale offset would return nothing and silently lose the new content.
 
 ### 4.2 SQLite store (`~/.local/share/local-agent-tracker/tracker.db`)
 Canonical, append-mostly schema (sketch — final DDL in the implementation):
@@ -145,7 +166,8 @@ Grafana/SQL comparisons then reduce to `GROUP BY model, fingerprint` or `GROUP B
 - A pricing JSON is **vendored in this repo**, seeded from LiteLLM's community-maintained `model_prices_and_context_window.json`, covering input/output/cache-read/cache-write rates — including the ephemeral **5m vs 1h cache-write price split**.
 - Refreshed only by an explicit `tracker pricing update` (fetch → diff → commit); collector runs are deterministic and offline-safe.
 - Every `messages` row stores the **pricing version used** — history is never silently repriced when rates change.
-- **Unknown models are flagged (`derived_cost = NULL`, warning in the run log), never guessed.**
+- **Unknown models are flagged (`derived_cost = NULL`, warning in the run log), never guessed.** There is a distinct third state: `<synthetic>` responses are generated locally and never billed, so they resolve to an explicit `0.0` with `cost_source = 'zero-rated'` and must not trip the missing-pricing warning. The states are `reported` (pi) / `derived` (Claude) / `zero-rated` / `unknown`.
+- **`claude-fable-5` is a real first-party model at $10/$50 per MTok, not an alias.** Pricing it as an Opus-tier model would halve its reported cost — $63 of the spend measured here.
 - Validation: cost math is cross-checked against `ccusage` (Claude Code) and `@ccusage/pi` output for the same day before trusting dashboards.
 
 ## 8. Operational notes

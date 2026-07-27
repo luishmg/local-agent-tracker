@@ -1,0 +1,23 @@
+[Unit]
+Description=Run the local-agent-tracker collector every 5 minutes
+Documentation=https://github.com/luishmg/local-agent-tracker
+
+[Timer]
+# Every 5 minutes, plus shortly after boot. The collector's own --max-seconds
+# budget (default 240s) keeps a run inside its slot; flock in the service covers
+# the case where it does not.
+OnCalendar=*:0/5
+OnBootSec=2min
+
+# Catch up after suspend or a powered-off stretch. Because ingest is idempotent
+# (ADR-0005), a catch-up run is just an ordinary run.
+Persistent=true
+
+# Without jitter every timer on the machine fires on the same wall-clock second.
+RandomizedDelaySec=30
+AccuracySec=1min
+
+Unit=agent-tracker.service
+
+[Install]
+WantedBy=timers.target

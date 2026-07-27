@@ -1,0 +1,91 @@
+{
+  "version": "2026-07-26",
+  "fetched_at": "2026-07-26T00:00:00Z",
+  "source_url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+  "source_note": "Seeded by hand from first-party Anthropic published rates rather than from LiteLLM. Cache rates are derived from the documented multipliers: cache read = 0.1x input, 5m cache write = 1.25x input, 1h cache write = 2x input. `tracker pricing update` replaces this file from LiteLLM and will overwrite these values.",
+  "upstream_sha256": null,
+  "models": {
+    "claude-opus-5": {
+      "input_usd_per_token": 5e-06,
+      "output_usd_per_token": 2.5e-05,
+      "cache_read_usd_per_token": 5e-07,
+      "cache_write_5m_usd_per_token": 6.25e-06,
+      "cache_write_1h_usd_per_token": 1e-05,
+      "cache_write_1h_source": "derived-2x-input",
+      "upstream_key": "claude-opus-5"
+    },
+    "claude-opus-4-8": {
+      "input_usd_per_token": 5e-06,
+      "output_usd_per_token": 2.5e-05,
+      "cache_read_usd_per_token": 5e-07,
+      "cache_write_5m_usd_per_token": 6.25e-06,
+      "cache_write_1h_usd_per_token": 1e-05,
+      "cache_write_1h_source": "derived-2x-input",
+      "upstream_key": "claude-opus-4-8"
+    },
+    "claude-opus-4-7": {
+      "input_usd_per_token": 5e-06,
+      "output_usd_per_token": 2.5e-05,
+      "cache_read_usd_per_token": 5e-07,
+      "cache_write_5m_usd_per_token": 6.25e-06,
+      "cache_write_1h_usd_per_token": 1e-05,
+      "cache_write_1h_source": "derived-2x-input",
+      "upstream_key": "claude-opus-4-7"
+    },
+    "claude-opus-4-6": {
+      "input_usd_per_token": 5e-06,
+      "output_usd_per_token": 2.5e-05,
+      "cache_read_usd_per_token": 5e-07,
+      "cache_write_5m_usd_per_token": 6.25e-06,
+      "cache_write_1h_usd_per_token": 1e-05,
+      "cache_write_1h_source": "derived-2x-input",
+      "upstream_key": "claude-opus-4-6"
+    },
+    "claude-fable-5": {
+      "input_usd_per_token": 1e-05,
+      "output_usd_per_token": 5e-05,
+      "cache_read_usd_per_token": 1e-06,
+      "cache_write_5m_usd_per_token": 1.25e-05,
+      "cache_write_1h_usd_per_token": 2e-05,
+      "cache_write_1h_source": "derived-2x-input",
+      "upstream_key": "claude-fable-5"
+    },
+    "claude-mythos-5": {
+      "input_usd_per_token": 1e-05,
+      "output_usd_per_token": 5e-05,
+      "cache_read_usd_per_token": 1e-06,
+      "cache_write_5m_usd_per_token": 1.25e-05,
+      "cache_write_1h_usd_per_token": 2e-05,
+      "cache_write_1h_source": "derived-2x-input",
+      "upstream_key": "claude-mythos-5"
+    },
+    "claude-sonnet-5": {
+      "input_usd_per_token": 2e-06,
+      "output_usd_per_token": 1e-05,
+      "cache_read_usd_per_token": 2e-07,
+      "cache_write_5m_usd_per_token": 2.5e-06,
+      "cache_write_1h_usd_per_token": 4e-06,
+      "cache_write_1h_source": "derived-2x-input",
+      "upstream_key": "claude-sonnet-5",
+      "note": "INTRODUCTORY pricing, in effect through 2026-08-31. Standard rates are $3/$15 per MTok (input 3e-06, output 1.5e-05, cache read 3e-07, 5m write 3.75e-06, 1h write 6e-06). Because every messages row stores its pricing_version (ADR-0004), rows priced before the changeover keep the introductory rate and are never silently repriced -- but a NEW pricing version must be cut on 2026-09-01 or later spend will be under-reported."
+    },
+    "claude-sonnet-4-6": {
+      "input_usd_per_token": 3e-06,
+      "output_usd_per_token": 1.5e-05,
+      "cache_read_usd_per_token": 3e-07,
+      "cache_write_5m_usd_per_token": 3.75e-06,
+      "cache_write_1h_usd_per_token": 6e-06,
+      "cache_write_1h_source": "derived-2x-input",
+      "upstream_key": "claude-sonnet-4-6"
+    },
+    "claude-haiku-4-5": {
+      "input_usd_per_token": 1e-06,
+      "output_usd_per_token": 5e-06,
+      "cache_read_usd_per_token": 1e-07,
+      "cache_write_5m_usd_per_token": 1.25e-06,
+      "cache_write_1h_usd_per_token": 2e-06,
+      "cache_write_1h_source": "derived-2x-input",
+      "upstream_key": "claude-haiku-4-5"
+    }
+  }
+}

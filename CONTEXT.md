@@ -13,8 +13,12 @@ One conversation with an Agent, identified by the agent's own session id and per
 _Avoid_: run, conversation, chat
 
 **Message**:
-One assistant response inside a Session — the unit that carries token usage and cost. The finest grain stored.
-_Avoid_: turn (a turn may span multiple API calls), completion, response
+One assistant response inside a Session — the unit that carries token usage and cost. The finest grain stored. Claude Code writes a single Message as several JSONL lines, one per content block, each repeating the same usage; the `message.id` those lines share — not the per-line `uuid` — is the Message's identity.
+_Avoid_: turn (a turn may span multiple API calls), completion, response, line
+
+**Dedup Key**:
+The globally scoped identity a stored row is keyed on, making ingestion idempotent. For a Message it is the provider's `message.id` (Claude Code) or a hash of the entry's stable fields (pi, which assigns none). Global, never per-Session, because both Agents copy Message history into a new transcript when a Session is resumed.
+_Avoid_: natural key, primary key, uuid
 
 **Collector Run**:
 One timer-fired execution of the collector: ingest → derive → render → ship → exit.
